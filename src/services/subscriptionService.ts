@@ -116,9 +116,36 @@ export async function isTrialExpired(userId: string): Promise<boolean> {
   }
 }
 
-export const PLANS = {
-  FREE_TRIAL: "free_trial",
-  BASIC: "basic",
-  PRO: "pro",
-  ENTERPRISE: "enterprise",
-};
+export async function canSchedulePost(
+  clientId: string,
+  userId: string
+): Promise<{ allowed: boolean; reason?: string; remaining?: number }> {
+  try {
+    const plan = await getPlanLimits(userId);
+    if (!plan) return { allowed: false, reason: "No subscription plan found" };
+
+    if (plan.max_scheduled_posts === -1) return { allowed: true }; // Unlimited
+
+    const { count } = await supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", clientId)
+      .in("status", ["Scheduled", "Pending_Approval"]); // Count scheduled + pending
+
+    const used = count ?? 0;
+    const remaining = plan.max_scheduled_posts - used;
+
+    if (used >= plan.max_scheduled_posts) {
+      return {
+        allowed: false,
+        reason: `Your ${plan.name} plan allows ${plan.max_scheduled_posts} scheduled posts. You've reached the limit. Upgrade to schedule more.`,
+        remaining: 0,
+      };
+    }
+
+    return { allowed: true, remaining };
+  } catch (error) {
+    console.error("Error checking scheduled posts limit:", error);
+    return { allowed: false, reason: "Error checking limits" };
+  }
+}
