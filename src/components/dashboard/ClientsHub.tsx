@@ -1,0 +1,125 @@
+import { useState } from "react";
+import { Users, PlusCircle, Building2, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { usePipeline } from "@/hooks/usePipeline";
+import ClientWorkspace from "./ClientWorkspace";
+
+interface Props {
+  onCreateContent: (client: any) => void;
+}
+
+export default function ClientsHub({ onCreateContent }: Props) {
+  const { clients, loading, refetch } = usePipeline();
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const activeClient = clients.find((c) => c.id === selected);
+
+  if (activeClient) {
+    return (
+      <ClientWorkspace
+        client={activeClient as any}
+        onBack={() => setSelected(null)}
+        onRefresh={refetch}
+        onCreateContent={onCreateContent}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display font-bold text-xl">Clients</h2>
+          <p className="text-sm text-muted-foreground font-body mt-0.5">
+            Each client has their own workspace, calendar, and approval queue.
+          </p>
+        </div>
+        <Button onClick={() => window.location.href = "/onboard"} className="font-display gap-2" size="sm">
+          <PlusCircle className="w-4 h-4" /> Add Client
+        </Button>
+      </div>
+
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-36 rounded-xl border border-border bg-card animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {!loading && clients.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-4">
+          <Building2 className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+          <div>
+            <p className="font-display font-semibold text-foreground">No clients yet</p>
+            <p className="text-sm text-muted-foreground font-body mt-1">
+              Add your first client to get started.
+            </p>
+          </div>
+          <Button onClick={() => window.location.href = "/onboard"} className="font-display gap-2">
+            <PlusCircle className="w-4 h-4" /> Add Client
+          </Button>
+        </div>
+      )}
+
+      {!loading && clients.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clients.map((client) => {
+            const pending = (client.posts ?? []).filter((p) => p.status === "Pending_Approval").length;
+            const platforms: string[] = (client as any).platforms || [];
+
+            return (
+              <button
+                key={client.id}
+                onClick={() => setSelected(client.id)}
+                className="text-left rounded-xl border border-border bg-card p-5 space-y-3 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <Building2 className="w-4 h-4 text-primary" />
+                  </div>
+                  {pending > 0 && (
+                    <span className="text-xs bg-yellow-500 text-black font-bold rounded-full px-2 py-0.5 shrink-0">
+                      {pending} pending
+                    </span>
+                  )}
+                </div>
+
+                {/* Name + industry */}
+                <div>
+                  <p className="font-display font-semibold text-sm text-foreground">{client.company_name}</p>
+                  <p className="text-xs text-muted-foreground font-body mt-0.5">{client.industry}</p>
+                </div>
+
+                {/* Platforms */}
+                {platforms.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {platforms.slice(0, 3).map((p) => (
+                      <span key={p} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-body">
+                        {p}
+                      </span>
+                    ))}
+                    {platforms.length > 3 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-body">
+                        +{platforms.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* AI summary preview */}
+                {(client as any).ai_summary && (
+                  <p className="text-xs text-muted-foreground font-body line-clamp-2 leading-relaxed">
+                    <Sparkles className="inline w-3 h-3 text-primary mr-1" />
+                    {(client as any).ai_summary}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

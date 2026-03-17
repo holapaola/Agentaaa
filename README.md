@@ -1,80 +1,73 @@
-# Agency AAA Platform
+# Welcome to your Lovable project
 
-An AI-powered social media management platform for agencies.
+## Project info
 
-## Features
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-- 🤖 **AI Insights** – Generate content ideas and captions with AI
-- 📅 **Content Calendar** – Plan and schedule posts visually
-- 🚀 **Action Center** – Manage all pending tasks in one place
-- 📊 **Analytics** – Track performance across social channels
-- ⚙️ **Settings** – Manage accounts and integrations
+## How can I edit this code?
 
-## Tech Stack
+There are several ways of editing your application.
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
-- **Backend**: Supabase (Auth + Database)
-- **AI**: OpenAI API
-- **Social Media**: Twitter, Instagram, LinkedIn APIs
+**Use Lovable**
 
-## Getting Started
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-### Prerequisites
+Changes made via Lovable will be committed automatically to this repo.
 
-- Node.js 18+
-- A [Supabase](https://supabase.com) project
-- An [OpenAI](https://openai.com) API key
+**Use your preferred IDE**
 
-### Installation
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-```bash
-# Clone the repository
-git clone https://github.com/holapaola/agentaaa.git
-cd agentaaa
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-# Install dependencies
-npm install
+Follow these steps:
 
-# Create your environment file
-cp .env.example .env.local
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-# Add your API keys to .env.local
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
 
-# Run database migrations in your Supabase project
-# (copy the SQL from supabase/migrations/001_init.sql)
+# Step 3: Install the necessary dependencies.
+npm i
 
-# Start the development server
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+**Edit a file directly in GitHub**
 
-### Build for Production
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-```bash
-npm run build
-npm run preview
-```
+**Use GitHub Codespaces**
 
-## Project Structure
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-```
-src/
-├── components/
-│   ├── dashboard/      # Dashboard tab components
-│   └── ui/             # Reusable UI components
-├── hooks/              # Custom React hooks
-├── pages/              # Route-level pages
-├── services/           # API service layers
-└── types/              # TypeScript type definitions
-supabase/
-└── migrations/         # SQL migrations
-```
+## What technologies are used for this project?
 
-## Environment Variables
+This project is built with:
 
-See `.env.example` for all required environment variables.
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-## License
+## How can I deploy this project?
 
-MIT
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+
+## Can I connect a custom domain to my Lovable project?
+
+Yes, you can!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { User as AppUser } from '../types';
-import { supabase } from '../services/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthState {
   user: AppUser | null;

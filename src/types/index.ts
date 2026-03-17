@@ -1,4 +1,4 @@
-// Shared TypeScript types for the Agency AAA Platform
+// Shared TypeScript types for the AgentAAA Platform
 
 export interface User {
   id: string;
