@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { Users, PlusCircle, Building2, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, PlusCircle, Building2, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePipeline } from "@/hooks/usePipeline";
+import { useAuth } from "@/hooks/useAuth";
+import { canAddClient } from "@/services/subscriptionService";
 import ClientWorkspace from "./ClientWorkspace";
+import { toast } from "sonner";
 
 interface Props {
   onCreateContent: (client: any) => void;
@@ -10,7 +13,19 @@ interface Props {
 
 export default function ClientsHub({ onCreateContent }: Props) {
   const { clients, loading, refetch } = usePipeline();
+  const { user } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
+  const [canAdd, setCanAdd] = useState(true);
+  const [addReason, setAddReason] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      canAddClient(user.id).then((result) => {
+        setCanAdd(result.allowed);
+        setAddReason(result.reason || "");
+      });
+    }
+  }, [user, clients.length]);
 
   const activeClient = clients.find((c) => c.id === selected);
 
@@ -34,7 +49,13 @@ export default function ClientsHub({ onCreateContent }: Props) {
             Each client has their own workspace, calendar, and approval queue.
           </p>
         </div>
-        <Button onClick={() => window.location.href = "/onboard"} className="font-display gap-2" size="sm">
+        <Button 
+          onClick={() => canAdd ? window.location.href = "/onboard" : toast.error(addReason)}
+          disabled={!canAdd}
+          className="font-display gap-2" 
+          size="sm"
+        >
+          {!canAdd && <Lock className="w-4 h-4" />}
           <PlusCircle className="w-4 h-4" /> Add Client
         </Button>
       </div>
