@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSubscription } from "@/hooks/useSubscription";
+import { NO_PLANS_MODE } from "@/lib/appMode";
 
 interface Props {
   children: ReactNode;
@@ -16,6 +17,10 @@ interface Props {
  */
 const SubscriptionGate = ({ children, featureName = "this feature" }: Props) => {
   const { isActive, loading } = useSubscription();
+
+  if (NO_PLANS_MODE) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
@@ -35,14 +40,14 @@ const SubscriptionGate = ({ children, featureName = "this feature" }: Props) => 
         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
           <Lock className="w-5 h-5 text-primary" />
         </div>
-        <h3 className="font-display font-bold text-lg">Subscription Required</h3>
+        <h3 className="font-display font-bold text-lg">Access Setup Required</h3>
         <p className="text-sm text-muted-foreground font-body max-w-xs">
-          You need an active plan to use {featureName}. Start your 7-day free trial — no credit card required.
+          {featureName} is currently unavailable until access setup is complete.
         </p>
         <Button asChild className="glow-gold font-display">
           <Link to="/mock-checkout">
             <Sparkles className="w-4 h-4 mr-2" />
-            Start Free Trial
+            Continue
           </Link>
         </Button>
       </motion.div>

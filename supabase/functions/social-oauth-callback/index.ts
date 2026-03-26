@@ -148,8 +148,8 @@ Deno.serve(async (req) => {
 
     return redirect("/?oauth_success=" + encodeURIComponent(platform) + "&client=" + clientId);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("OAuth error:", err);
-    return redirect("/?oauth_error=" + encodeURIComponent(err.message ?? "unknown"));
+    return redirect("/?oauth_error=" + encodeURIComponent(err instanceof Error ? err.message : "unknown"));
   }
 });

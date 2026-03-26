@@ -15,7 +15,7 @@ const PaymentCancel = () => {
         <XCircle className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
         <h1 className="text-3xl font-display font-bold mb-3">No worries!</h1>
         <p className="text-muted-foreground font-body mb-8">
-          Your checkout was cancelled. Come back whenever you're ready — your 7-day free trial will be waiting.
+          Billing is paused for now, so you can go back and keep working without checkout.
         </p>
         <Button asChild variant="outline" size="lg" className="h-12 px-8 font-display">
           <Link to="/">

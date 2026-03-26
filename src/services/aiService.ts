@@ -1,10 +1,15 @@
 import type { AIInsight } from '../types';
 import { supabase } from '@/integrations/supabase/client';
+import { NO_PLANS_MODE } from '@/lib/appMode';
 
 const openAiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
 
 // ── Subscription guard ────────────────────────────────────────────────────────
 export async function checkSubscription(userId: string): Promise<void> {
+  if (NO_PLANS_MODE) {
+    return;
+  }
+
   const { data } = await supabase
     .from("profiles")
     .select("subscription_status")
@@ -31,7 +36,7 @@ async function callOpenAI(prompt: string): Promise<string> {
       Authorization: `Bearer ${openAiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 512,
     }),

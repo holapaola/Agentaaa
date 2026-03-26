@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { NO_PLANS_MODE } from "@/lib/appMode";
 
 export type SubscriptionStatus = "inactive" | "trialing" | "active" | "canceled";
 export type SubscriptionPlan   = "starter" | "agency" | "enterprise" | null;
@@ -22,6 +23,11 @@ export function useSubscription(): SubscriptionState {
   });
 
   useEffect(() => {
+    if (NO_PLANS_MODE) {
+      setState({ status: "active", plan: null, isActive: true, loading: false });
+      return;
+    }
+
     if (!user) {
       setState({ status: "inactive", plan: null, isActive: false, loading: false });
       return;

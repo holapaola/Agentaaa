@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, Instagram, Twitter, Linkedin, Facebook, Music } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, X, Instagram, Twitter, Linkedin, Facebook, Music, GripVertical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import type { AppPost } from '@/types';
+import { selectAgencyClients } from '@/services/clientService';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -19,11 +22,6 @@ const CLIENT_COLORS = [
   'bg-indigo-500',
 ];
 
-const CLIENT_COLORS_HEX = [
-  '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#06b6d4',
-  '#f97316', '#14b8a6', '#d946ef', '#84cc16', '#6366f1',
-];
-
 const PLATFORM_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
   Instagram:     { color: 'bg-pink-500',   icon: <Instagram className="w-3 h-3" /> },
   'Twitter / X': { color: 'bg-sky-500',    icon: <Twitter className="w-3 h-3" /> },
@@ -33,29 +31,43 @@ const PLATFORM_STYLE: Record<string, { color: string; icon: React.ReactNode }> =
 };
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10); // YYYY-MM-DD
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+type CalendarPost = AppPost & {
+  scheduled_at: string;
+  clients?: {
+    company_name?: string;
+  } | null;
+};
+
 export default function ContentCalendar({ clientId }: { clientId?: string }) {
   const { user } = useAuth();
   const isGlobal = !clientId;
   const today = new Date();
   const [current, setCurrent] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [postsByDay, setPostsByDay] = useState<Record<string, any[]>>({});
+  const [postsByDay, setPostsByDay] = useState<Record<string, CalendarPost[]>>({});
   const [clientColorMap, setClientColorMap] = useState<Record<string, { color: string; name: string }>>({});
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dragPostId, setDragPostId] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const currentYear = current.getFullYear();
+  const currentMonth = current.getMonth();
 
   useEffect(() => {
     if (!user) return;
     setLoading(true);
 
-    const startOfMonth = new Date(current.getFullYear(), current.getMonth(), 1).toISOString();
-    const endOfMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0, 23, 59, 59).toISOString();
+    const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString();
+    const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).toISOString();
 
     supabase
       .from('agencies')
@@ -67,11 +79,11 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
 
         // Build client color map for global view
         if (isGlobal) {
-          const { data: clients } = await supabase
-            .from('clients')
-            .select('id, company_name')
-            .eq('agency_id', agency.id)
-            .order('created_at', { ascending: true });
+          const { data: clients } = await selectAgencyClients<{ id: string; company_name: string }>(
+            agency.id,
+            'id, company_name',
+            { orderBy: "created_at", ascending: true },
+          );
           const map: Record<string, { color: string; name: string }> = {};
           (clients ?? []).forEach((c, i) => {
             map[c.id] = { color: CLIENT_COLORS[i % CLIENT_COLORS.length], name: c.company_name };
@@ -90,19 +102,19 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
         if (clientId) query = query.eq('client_id', clientId);
 
         const { data } = await query;
-        const map: Record<string, any[]> = {};
+        const map: Record<string, CalendarPost[]> = {};
         (data ?? []).forEach((post) => {
           const key = toDateKey(new Date(post.scheduled_at));
           if (!map[key]) map[key] = [];
-            map[key].push(post);
-          });
-          setPostsByDay(map);
-          setLoading(false);
+          map[key].push(post as CalendarPost);
         });
-  }, [user?.id, current.getFullYear(), current.getMonth(), clientId]);
+        setPostsByDay(map);
+        setLoading(false);
+      });
+  }, [clientId, currentMonth, currentYear, isGlobal, user]);
 
-  const year = current.getFullYear();
-  const month = current.getMonth();
+  const year = currentYear;
+  const month = currentMonth;
   const totalDays = daysInMonth(year, month);
   const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
   const cells: (number | null)[] = [
@@ -118,6 +130,72 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
   const monthLabel = current.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   const selectedPosts = selectedDay ? (postsByDay[selectedDay] ?? []) : [];
+
+  // ── Drag-and-drop helpers ──────────────────────────────────────────────────
+  const handleDragStart = (e: React.DragEvent, postId: string) => {
+    setDragPostId(postId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, key: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverKey(key);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetKey: string) => {
+    e.preventDefault();
+    setDragOverKey(null);
+    if (!dragPostId) return;
+
+    // Find the post being dragged
+    const allPosts = Object.values(postsByDay).flat();
+    const post = allPosts.find((p) => p.id === dragPostId);
+    if (!post) return;
+
+    const currentKey = toDateKey(new Date(post.scheduled_at));
+    if (currentKey === targetKey) return;
+
+    // Keep the same time, change the date
+    const originalDate = new Date(post.scheduled_at);
+    const [ty, tm, td] = targetKey.split('-').map(Number);
+    const newDate = new Date(ty, tm - 1, td, originalDate.getHours(), originalDate.getMinutes(), 0, 0);
+
+    // Optimistic update
+    setPostsByDay((prev) => {
+      const next = { ...prev };
+      next[currentKey] = (next[currentKey] ?? []).filter((p) => p.id !== dragPostId);
+      const updatedPost = { ...post, scheduled_at: newDate.toISOString() };
+      next[targetKey] = [...(next[targetKey] ?? []), updatedPost];
+      return next;
+    });
+    if (selectedDay === currentKey) setSelectedDay(targetKey);
+
+    const { error } = await supabase
+      .from('posts')
+      .update({ scheduled_at: newDate.toISOString() })
+      .eq('id', dragPostId);
+
+    if (error) {
+      toast.error('Failed to reschedule post.');
+      // Revert optimistic update
+      setPostsByDay((prev) => {
+        const next = { ...prev };
+        next[targetKey] = (next[targetKey] ?? []).filter((p) => p.id !== dragPostId);
+        next[currentKey] = [...(next[currentKey] ?? []), post];
+        return next;
+      });
+    } else {
+      const newLabel = newDate.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+      toast.success(`Post moved to ${newLabel} ✅`);
+    }
+    setDragPostId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragPostId(null);
+    setDragOverKey(null);
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -158,9 +236,12 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
             <button
               key={key}
               onClick={() => setSelectedDay(isSelected ? null : key)}
+              onDragOver={(e) => handleDragOver(e, key)}
+              onDrop={(e) => handleDrop(e, key)}
+              onDragLeave={() => setDragOverKey(null)}
               className={`bg-background min-h-[80px] p-2 text-left transition-colors hover:bg-secondary/60 flex flex-col gap-1 ${
                 isSelected ? 'ring-2 ring-inset ring-primary' : ''
-              }`}
+              } ${dragOverKey === key ? 'bg-primary/10 ring-2 ring-inset ring-primary/50' : ''}`}
             >
               <span className={`text-xs font-display font-semibold w-6 h-6 flex items-center justify-center rounded-full ${
                 isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
@@ -215,7 +296,18 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
                 const platformStyle = PLATFORM_STYLE[post.platform ?? ''] ?? { color: 'bg-muted', icon: null };
                 const clientColor = isGlobal ? (clientColorMap[post.client_id]?.color ?? 'bg-muted') : platformStyle.color;
                 return (
-                  <div key={post.id} className="flex gap-3 p-3 rounded-lg bg-secondary/50 border border-border/50">
+                  <div
+                    key={post.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, post.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex gap-3 p-3 rounded-lg bg-secondary/50 border border-border/50 cursor-grab active:cursor-grabbing transition-opacity ${
+                      dragPostId === post.id ? 'opacity-40' : ''
+                    }`}
+                  >
+                    <div className="mt-2 text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+                      <GripVertical className="w-3.5 h-3.5" />
+                    </div>
                     {/* Left accent: client color (global) or platform color (single client) */}
                     <div className={`mt-0.5 w-1.5 rounded-full flex-shrink-0 self-stretch ${clientColor}`} />
                     <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0 ${platformStyle.color}`}>
@@ -275,4 +367,3 @@ export default function ContentCalendar({ clientId }: { clientId?: string }) {
     </div>
   );
 }
-

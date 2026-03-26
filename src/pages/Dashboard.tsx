@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardHeader from "@/components/DashboardHeader";
 import StatsBar from "@/components/StatsBar";
 import Overview from "@/components/dashboard/Overview";
@@ -9,6 +10,9 @@ import AnalyticsHub from "@/components/dashboard/AnalyticsHub";
 import ClientsHub from "@/components/dashboard/ClientsHub";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { AppClient } from "@/types";
+import { countVisibleAgencyClients } from "@/services/clientService";
+import { getProfileForUser } from "@/services/profileService";
 
 type Tab = "studio" | "clients" | "overview" | "calendar" | "analytics" | "settings";
 
@@ -23,29 +27,43 @@ const tabs: { id: Tab; label: string; emoji: string }[] = [
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("studio");
-  const [studioClient, setStudioClient] = useState<any>(null);
+  const [studioClient, setStudioClient] = useState<AppClient | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     const fetchPending = async () => {
-      const { data: profile } = await supabase.from("profiles").select("agency_id").eq("id", user.id).single();
-      if (!profile?.agency_id) return;
-      const { data: clients } = await supabase.from("clients").select("id").eq("agency_id", profile.agency_id);
-      if (!clients?.length) return;
-      const { count } = await supabase.from("posts")
-        .select("id", { count: "exact", head: true })
-        .in("client_id", clients.map((c) => c.id))
-        .eq("status", "Pending_Approval");
-      setPendingCount(count ?? 0);
+      try {
+        const profile = await getProfileForUser<{ agency_id: string | null }>(user.id, "agency_id");
+        if (!profile?.agency_id) {
+          setPendingCount(0);
+          return;
+        }
+        const visibleClients = await countVisibleAgencyClients(profile.agency_id);
+        if (!visibleClients) {
+          navigate('/onboard', { replace: true });
+          return;
+        }
+        const { data: clients } = await supabase.from("clients").select("id").eq("agency_id", profile.agency_id);
+        if (!clients?.length) return;
+        const { count } = await supabase.from("posts")
+          .select("id", { count: "exact", head: true })
+          .in("client_id", clients.map((c) => c.id))
+          .eq("status", "Pending_Approval");
+        setPendingCount(count ?? 0);
+      } catch (error) {
+        console.error("Failed to load pending post count:", error);
+        setPendingCount(0);
+      }
     };
     fetchPending();
     const interval = setInterval(fetchPending, 30_000);
     return () => clearInterval(interval);
   }, [user]);
 
-  function openStudioForClient(client: any) {
+  function openStudioForClient(client: AppClient) {
     setStudioClient(client);
     setActiveTab("studio");
   }

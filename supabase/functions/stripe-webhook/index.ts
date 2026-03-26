@@ -39,12 +39,18 @@ Deno.serve(async (req) => {
   switch (event.type) {
     case "checkout.session.completed": {
       const s = session as Stripe.Checkout.Session;
+      const subscription = typeof s.subscription === "string"
+        ? await stripe.subscriptions.retrieve(s.subscription)
+        : null;
       await supabase.from("subscriptions").upsert({
         user_id: s.metadata?.userId,
         stripe_customer_id: s.customer as string,
         stripe_subscription_id: s.subscription as string,
         plan: s.metadata?.plan,
         status: "trialing",
+        current_period_end: subscription?.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
       });
       break;
     }
@@ -52,7 +58,12 @@ Deno.serve(async (req) => {
       const sub = session as Stripe.Subscription;
       await supabase
         .from("subscriptions")
-        .update({ status: sub.status })
+        .update({
+          status: sub.status,
+          current_period_end: sub.current_period_end
+            ? new Date(sub.current_period_end * 1000).toISOString()
+            : null,
+        })
         .eq("stripe_subscription_id", sub.id);
       break;
     }
@@ -60,7 +71,12 @@ Deno.serve(async (req) => {
       const sub = session as Stripe.Subscription;
       await supabase
         .from("subscriptions")
-        .update({ status: "canceled" })
+        .update({
+          status: "canceled",
+          current_period_end: sub.current_period_end
+            ? new Date(sub.current_period_end * 1000).toISOString()
+            : null,
+        })
         .eq("stripe_subscription_id", sub.id);
       break;
     }

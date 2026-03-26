@@ -71,9 +71,9 @@ export default function VideoSummarizer() {
 
       toast.success("Video analyzed and captions generated!");
       setUrl("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || "Failed to analyze video");
+      toast.error(err instanceof Error ? err.message : "Failed to analyze video");
     } finally {
       setIsLoading(false);
     }

@@ -15,7 +15,7 @@ const PaymentSuccess = () => {
         <CheckCircle className="w-16 h-16 text-primary mx-auto mb-6" />
         <h1 className="text-3xl font-display font-bold mb-3">You're in! 🎉</h1>
         <p className="text-muted-foreground font-body mb-2">
-          Your 7-day free trial has started. No charge until your trial ends.
+          Access is unlocked right now while plans are turned off during product setup.
         </p>
         <p className="text-sm text-muted-foreground font-body mb-8">
           Let's set up your first client and get your AI agents working.

@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, Loader2, Sparkles, ArrowRight, XCircle } from 'lu
 import { Button } from '@/components/ui/button';
 import { cancelPipeline } from '@/services/agentService';
 import type { PipelineClient } from '@/hooks/usePipeline';
+import ReportRenderer from './ReportRenderer';
 
 const STAGES = ['Researching', 'Drafting', 'Pending_Approval', 'Scheduled'] as const;
 type Stage = typeof STAGES[number];
@@ -156,24 +157,26 @@ export default function PipelineStatus({ clients, loading }: Props) {
             {/* Research notes expandable */}
             {client.research_notes && stageIdx >= 1 && (
               <details className="mt-5 group">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-body select-none">
-                  📄 View research notes
+                <summary className="text-xs font-display font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none flex items-center gap-1.5 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+                  Market Research Report
                 </summary>
-                <pre className="mt-2 text-xs text-muted-foreground bg-secondary/40 rounded-lg p-4 whitespace-pre-wrap font-body leading-relaxed">
-                  {client.research_notes}
-                </pre>
+                <div className="mt-3">
+                  <ReportRenderer content={client.research_notes} type="research" />
+                </div>
               </details>
             )}
 
             {/* Strategy expandable */}
             {client.content_strategy && stageIdx >= 2 && (
-              <details className="mt-2 group">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-body select-none">
-                  📋 View content strategy
+              <details className="mt-3 group">
+                <summary className="text-xs font-display font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none flex items-center gap-1.5 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                  Content Strategy
                 </summary>
-                <pre className="mt-2 text-xs text-muted-foreground bg-secondary/40 rounded-lg p-4 whitespace-pre-wrap font-body leading-relaxed">
-                  {client.content_strategy}
-                </pre>
+                <div className="mt-3">
+                  <ReportRenderer content={client.content_strategy} type="strategy" />
+                </div>
               </details>
             )}
 

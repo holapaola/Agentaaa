@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Users, PlusCircle, Building2, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePipeline } from "@/hooks/usePipeline";
@@ -6,23 +7,34 @@ import { useAuth } from "@/hooks/useAuth";
 import { canAddClient } from "@/services/subscriptionService";
 import ClientWorkspace from "./ClientWorkspace";
 import { toast } from "sonner";
+import type { AppClient } from "@/types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
-  onCreateContent: (client: any) => void;
+  onCreateContent: (client: AppClient) => void;
 }
 
 export default function ClientsHub({ onCreateContent }: Props) {
-  const { clients, loading, refetch } = usePipeline();
+  const { clients, loading, error, refetch } = usePipeline();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const [canAdd, setCanAdd] = useState(true);
   const [addReason, setAddReason] = useState("");
+  const [cooldownSlots, setCooldownSlots] = useState(0);
+
+  const blockedTooltipMessage =
+    addReason ||
+    (cooldownSlots > 0
+      ? `Limit reached. ${cooldownSlots} slot${cooldownSlots === 1 ? " is" : "s are"} currently in a billing-cycle cooldown period. Upgrade to Premium for unlimited slots.`
+      : "Add Client is currently unavailable.");
 
   useEffect(() => {
     if (user) {
       canAddClient(user.id).then((result) => {
         setCanAdd(result.allowed);
         setAddReason(result.reason || "");
+        setCooldownSlots(result.cooldownSlots || 0);
       });
     }
   }, [user, clients.length]);
@@ -32,7 +44,7 @@ export default function ClientsHub({ onCreateContent }: Props) {
   if (activeClient) {
     return (
       <ClientWorkspace
-        client={activeClient as any}
+        client={activeClient}
         onBack={() => setSelected(null)}
         onRefresh={refetch}
         onCreateContent={onCreateContent}
@@ -49,16 +61,41 @@ export default function ClientsHub({ onCreateContent }: Props) {
             Each client has their own workspace, calendar, and approval queue.
           </p>
         </div>
-        <Button 
-          onClick={() => canAdd ? window.location.href = "/onboard" : toast.error(addReason)}
-          disabled={!canAdd}
-          className="font-display gap-2" 
-          size="sm"
-        >
-          {!canAdd && <Lock className="w-4 h-4" />}
-          <PlusCircle className="w-4 h-4" /> Add Client
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={canAdd ? -1 : 0}>
+                <Button
+                  onClick={() => canAdd ? window.location.href = "/onboard" : toast.error(blockedTooltipMessage)}
+                  disabled={!canAdd}
+                  className="font-display gap-2"
+                  size="sm"
+                >
+                  {!canAdd && <Lock className="w-4 h-4" />}
+                  <PlusCircle className="w-4 h-4" /> Add Client
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!canAdd && (
+              <TooltipContent className="max-w-xs">
+                {blockedTooltipMessage}
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
+
+      {!canAdd && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          {blockedTooltipMessage}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          We couldn't load your clients right now. {error}
+        </div>
+      )}
 
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -87,7 +124,7 @@ export default function ClientsHub({ onCreateContent }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {clients.map((client) => {
             const pending = (client.posts ?? []).filter((p) => p.status === "Pending_Approval").length;
-            const platforms: string[] = (client as any).platforms || [];
+            const platforms = client.platforms || [];
 
             return (
               <button
@@ -130,10 +167,10 @@ export default function ClientsHub({ onCreateContent }: Props) {
                 )}
 
                 {/* AI summary preview */}
-                {(client as any).ai_summary && (
+                {client.ai_summary && (
                   <p className="text-xs text-muted-foreground font-body line-clamp-2 leading-relaxed">
                     <Sparkles className="inline w-3 h-3 text-primary mr-1" />
-                    {(client as any).ai_summary}
+                    {client.ai_summary}
                   </p>
                 )}
               </button>

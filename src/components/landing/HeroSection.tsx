@@ -54,7 +54,7 @@ const HeroSection = () => {
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
           <Button asChild size="lg" className="h-14 px-8 text-base font-display font-semibold glow-gold">
-            <Link to="/mock-checkout">
+            <Link to="/auth">
               Get Started
               <ArrowRight className="ml-2 w-5 h-5" />
             </Link>

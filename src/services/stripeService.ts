@@ -1,8 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
+import { NO_PLANS_MODE } from "@/lib/appMode";
 
 export type Plan = "starter" | "agency" | "enterprise";
 
 export async function redirectToCheckout(plan: Plan): Promise<void> {
+  if (NO_PLANS_MODE) {
+    window.location.href = "/mock-checkout";
+    return;
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {

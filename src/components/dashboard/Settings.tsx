@@ -146,10 +146,10 @@ export default function Settings() {
       <Card className="opacity-70">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Billing</CardTitle>
-          <CardDescription>Subscription and billing management</CardDescription>
+          <CardDescription>Billing is temporarily disabled while the product is being finalized</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Billing management coming soon. Your current plan: <span className="font-semibold text-foreground">Pro</span></p>
+          <p className="text-sm text-muted-foreground">All core features are currently unlocked. We can add plans back later once the workflow is stable.</p>
         </CardContent>
       </Card>
     </div>

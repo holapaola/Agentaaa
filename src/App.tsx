@@ -1,17 +1,19 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import Onboard from "./pages/Onboard.tsx";
-import Dashboard from "./pages/Dashboard.tsx";
-import Auth from "./pages/Auth.tsx";
-import MockCheckout from "./pages/MockCheckout.tsx";
-import NotFound from "./pages/NotFound.tsx";
-import PaymentSuccess from "./pages/PaymentSuccess.tsx";
-import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+
+const Index = lazy(() => import("./pages/Index.tsx"));
+const Auth = lazy(() => import("./pages/Auth.tsx"));
+const Onboard = lazy(() => import("./pages/Onboard.tsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
+const MockCheckout = lazy(() => import("./pages/MockCheckout.tsx"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess.tsx"));
+const PaymentCancel = lazy(() => import("./pages/PaymentCancel.tsx"));
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -21,7 +23,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={null}>
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboard" element={<ProtectedRoute><Onboard /></ProtectedRoute>} />
@@ -30,7 +33,8 @@ const App = () => (
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancel" element={<PaymentCancel />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

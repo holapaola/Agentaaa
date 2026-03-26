@@ -142,8 +142,8 @@ Deno.serve(async (req) => {
 
     return json({ success: true, publishedUrl });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("publish-post error:", err);
-    return json({ error: err.message ?? "Unknown error" }, 500);
+    return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
   }
 });

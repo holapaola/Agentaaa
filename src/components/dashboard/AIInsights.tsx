@@ -37,7 +37,7 @@ function AIInsightsInner() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'SUBSCRIPTION_REQUIRED') {
-        setResult('⚠️ Active subscription required to use AI features.');
+        setResult('⚠️ Access setup is still required for this AI tool.');
       } else {
         setResult('Error generating content. Please check your API key.');
       }

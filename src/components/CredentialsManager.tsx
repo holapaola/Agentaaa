@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Key, Plus, Trash2, Loader2, Eye, EyeOff, Check, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Key, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,11 +32,7 @@ export default function CredentialsManager({ clientId, onUpdate }: Props) {
     value: "",
   });
 
-  useEffect(() => {
-    fetchCredentials();
-  }, [clientId]);
-
-  async function fetchCredentials() {
+  const fetchCredentials = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -65,7 +61,11 @@ export default function CredentialsManager({ clientId, onUpdate }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [clientId]);
+
+  useEffect(() => {
+    fetchCredentials();
+  }, [fetchCredentials]);
 
   async function handleAdd() {
     if (!formData.platform || !formData.key_name || !formData.value) {

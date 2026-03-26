@@ -1,13 +1,19 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, Sparkles, PlusCircle, Wifi, WifiOff, Loader2, X, ExternalLink } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { ArrowLeft, Sparkles, PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import BrandProfileCard from "./BrandProfileCard";
-import ApprovalCard from "./ApprovalCard";
 import ContentCalendar from "./ContentCalendar";
-import CredentialsManager from "@/components/CredentialsManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { AppClient, AppPost } from "@/types";
+import { getBillingCycleEnd } from "@/services/subscriptionService";
+import { removeAgencyClient } from "@/services/clientService";
+import { NO_PLANS_MODE } from "@/lib/appMode";
+import { PLATFORM_OPTIONS } from "@/lib/clientProfileOptions";
+import ClientDeleteAlert from "@/components/workspace/ClientDeleteAlert";
+import SocialConnectModal from "@/components/workspace/SocialConnectModal";
+import ClientDetailsEditor, { type ClientEditForm } from "@/components/workspace/ClientDetailsEditor";
+import SocialAccountsView from "@/components/workspace/SocialAccountsView";
+import ClientOverviewTab from "@/components/workspace/ClientOverviewTab";
 
 const SUPABASE_URL = "https://cfgqppdkligczhktouny.supabase.co";
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/social-oauth-callback`;
@@ -28,34 +34,6 @@ function buildOAuthUrl(platform: string, clientId: string, userId: string): stri
   return null;
 }
 
-interface Client {
-  id: string;
-  company_name: string;
-  industry: string;
-  brand_voice: string;
-  platforms?: string[];
-  ai_summary?: string | null;
-  posts?: any[];
-  [key: string]: any;
-}
-
-interface Props {
-  client: Client;
-  onBack: () => void;
-  onRefresh: () => void;
-  onCreateContent: (client: Client) => void;
-}
-
-type View = "overview" | "calendar" | "social";
-
-const PLATFORMS = [
-  { id: "Instagram", emoji: "📸", color: "text-pink-400" },
-  { id: "LinkedIn",  emoji: "💼", color: "text-blue-400" },
-  { id: "Twitter",   emoji: "🐦", color: "text-sky-400" },
-  { id: "TikTok",    emoji: "🎵", color: "text-purple-400" },
-  { id: "Facebook",  emoji: "📘", color: "text-indigo-400" },
-];
-
 interface SocialAccount {
   id: string;
   platform: string;
@@ -63,26 +41,78 @@ interface SocialAccount {
   access_token: string | null;
 }
 
+function buildInitialForm(client: AppClient): ClientEditForm {
+  return {
+    company_name: client.company_name,
+    website_url: client.website_url ?? "",
+    business_description: client.business_description ?? "",
+    industry: client.industry ?? "",
+    brand_voice: client.brand_voice ?? "",
+    platforms: client.platforms ?? [],
+    campaign_goal: client.campaign_goal ?? "",
+    target_audience_type: (client.target_audience_type as "B2B" | "B2C" | "") ?? "",
+    target_age_range: client.target_age_range ?? "",
+    target_description: client.target_description ?? "",
+    content_types: client.content_types ?? [],
+    posting_frequency: client.posting_frequency ?? "",
+    brand_primary_color: (client as Record<string, unknown>).brand_primary_color as string ?? "",
+    brand_secondary_color: (client as Record<string, unknown>).brand_secondary_color as string ?? "",
+    brand_accent_color: (client as Record<string, unknown>).brand_accent_color as string ?? "",
+    brand_visual_style: (client as Record<string, unknown>).brand_visual_style as string ?? "",
+    brand_personality_tags: (client as Record<string, unknown>).brand_personality_tags as string[] ?? [],
+    brand_notes: (client as Record<string, unknown>).brand_notes as string ?? "",
+  };
+}
+
+interface Props {
+  client: AppClient;
+  onBack: () => void;
+  onRefresh: () => void;
+  onCreateContent: (client: AppClient) => void;
+}
+
+type View = "overview" | "calendar" | "social";
+
 export default function ClientWorkspace({ client, onBack, onRefresh, onCreateContent }: Props) {
   const [view, setView] = useState<View>("overview");
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
-  const [connectModal, setConnectModal] = useState<string | null>(null); // platform name (manual entry only)
+  const [connectModal, setConnectModal] = useState<string | null>(null);
   const [handle, setHandle] = useState("");
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<ClientEditForm>(() => buildInitialForm(client));
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [slotLockUntil, setSlotLockUntil] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const pendingPosts = (client.posts ?? []).filter((p: any) => p.status === "Pending_Approval");
+  // Suppress unused warning — kept for future use
+  void useMemo(() => PLATFORM_OPTIONS, []);
 
-  const refreshAccounts = () =>
+  const canSaveClient =
+    editForm.company_name.trim().length > 0 &&
+    editForm.industry.trim().length > 0 &&
+    editForm.platforms.length > 0 &&
+    editForm.brand_voice.trim().length > 0 &&
+    editForm.campaign_goal.trim().length > 0 &&
+    editForm.target_audience_type.length > 0 &&
+    editForm.target_age_range.trim().length > 0 &&
+    editForm.content_types.length > 0 &&
+    editForm.posting_frequency.trim().length > 0;
+
+  const pendingPosts = (client.posts ?? []).filter((p: AppPost) => p.status === "Pending_Approval");
+
+  const refreshAccounts = useCallback(() =>
     supabase.from("client_social_accounts").select("id, platform, account_handle, access_token")
-      .eq("client_id", client.id).then(({ data }) => setSocialAccounts(data ?? []));
+      .eq("client_id", client.id).then(({ data }) => setSocialAccounts(data ?? [])), [client.id]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
     refreshAccounts();
+    setEditForm(buildInitialForm(client));
 
-    // Detect OAuth callback results in URL
     const params = new URLSearchParams(window.location.search);
     const success = params.get("oauth_success");
     const err     = params.get("oauth_error");
@@ -95,21 +125,30 @@ export default function ClientWorkspace({ client, onBack, onRefresh, onCreateCon
       toast.error(`OAuth error: ${decodeURIComponent(err)}`);
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [client.id]);
+  }, [client, refreshAccounts]);
 
   async function connectAccount() {
     if (!connectModal || !handle.trim()) return;
     setSaving(true);
-    const existing = socialAccounts.find((a) => a.platform === connectModal);
-    if (existing) {
-      await supabase.from("client_social_accounts").update({ account_handle: handle, access_token: token || null }).eq("id", existing.id);
-    } else {
-      await supabase.from("client_social_accounts").insert({ client_id: client.id, platform: connectModal, account_handle: handle, access_token: token || null });
+    try {
+      const existing = socialAccounts.find((a) => a.platform === connectModal);
+      if (existing) {
+        const { error } = await supabase.from("client_social_accounts").update({ account_handle: handle, access_token: token || null }).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("client_social_accounts").insert({ client_id: client.id, platform: connectModal, account_handle: handle, access_token: token || null });
+        if (error) throw error;
+      }
+      await refreshAccounts();
+      toast.success(`${connectModal} account saved!`);
+      setConnectModal(null);
+      setHandle("");
+      setToken("");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save this social account.");
+    } finally {
+      setSaving(false);
     }
-    await refreshAccounts();
-    toast.success(`${connectModal} account saved!`);
-    setConnectModal(null); setHandle(""); setToken("");
-    setSaving(false);
   }
 
   function initiateOAuth(platform: string) {
@@ -118,19 +157,104 @@ export default function ClientWorkspace({ client, onBack, onRefresh, onCreateCon
     if (url) {
       window.location.href = url;
     } else {
-      // App ID not configured — fall back to manual entry
       toast.info(`Add VITE_${platform === "Instagram" ? "META" : "LINKEDIN"}_APP_ID to .env to enable real OAuth. Using manual entry for now.`);
       setConnectModal(platform);
       setHandle(""); setToken("");
     }
   }
 
+  function handleConnect(platform: string) {
+    if (platform === "Instagram" || platform === "LinkedIn") {
+      initiateOAuth(platform);
+    } else {
+      setConnectModal(platform); setHandle(""); setToken("");
+    }
+  }
+
+  function handleEditManual(platform: string, currentHandle: string) {
+    setConnectModal(platform);
+    setHandle(currentHandle);
+    setToken("");
+  }
+
   async function disconnectAccount(platform: string) {
     const acc = socialAccounts.find((a) => a.platform === platform);
     if (!acc) return;
-    await supabase.from("client_social_accounts").delete().eq("id", acc.id);
+    const { error } = await supabase.from("client_social_accounts").delete().eq("id", acc.id);
+    if (error) { toast.error(error.message); return; }
     setSocialAccounts((prev) => prev.filter((a) => a.platform !== platform));
     toast.success(`${platform} disconnected.`);
+  }
+
+  async function saveClientDetails() {
+    if (!canSaveClient) { toast.error("Please complete all required client details before saving."); return; }
+    setIsSavingClient(true);
+    try {
+      const { error } = await supabase.from("clients").update({
+        company_name: editForm.company_name.trim(),
+        website_url: editForm.website_url.trim() || null,
+        business_description: editForm.business_description.trim() || null,
+        industry: editForm.industry.trim(),
+        brand_voice: editForm.brand_voice,
+        platforms: editForm.platforms,
+        campaign_goal: editForm.campaign_goal,
+        target_audience_type: editForm.target_audience_type || null,
+        target_age_range: editForm.target_age_range || null,
+        target_description: editForm.target_description.trim() || null,
+        content_types: editForm.content_types,
+        posting_frequency: editForm.posting_frequency || null,
+        brand_primary_color: editForm.brand_primary_color || null,
+        brand_secondary_color: editForm.brand_secondary_color || null,
+        brand_accent_color: editForm.brand_accent_color || null,
+        brand_visual_style: editForm.brand_visual_style || null,
+        brand_personality_tags: editForm.brand_personality_tags.length > 0 ? editForm.brand_personality_tags : null,
+        brand_notes: editForm.brand_notes.trim() || null,
+      }).eq("id", client.id);
+      if (error) throw error;
+      toast.success("Client details updated.");
+      setEditOpen(false);
+      onRefresh();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Couldn't update this client.");
+    } finally {
+      setIsSavingClient(false);
+    }
+  }
+
+  async function openDeleteFlow() {
+    if (NO_PLANS_MODE) { setSlotLockUntil(null); setDeleteOpen(true); return; }
+    if (!userId) { toast.error("Please sign in again before deleting a client."); return; }
+    try {
+      const billingCycleEnd = await getBillingCycleEnd(userId);
+      setSlotLockUntil(billingCycleEnd);
+      setDeleteOpen(true);
+    } catch (error: unknown) {
+      console.warn("Falling back to immediate client deletion:", error);
+      setSlotLockUntil(null);
+      setDeleteOpen(true);
+    }
+  }
+
+  async function deleteClient() {
+    const deleteLockLabel = slotLockUntil
+      ? new Date(slotLockUntil).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+      : "your next billing cycle";
+    setIsDeleting(true);
+    try {
+      const result = await removeAgencyClient(client.id, { slotLockedUntil: slotLockUntil });
+      toast.success(
+        result.slotLocked
+          ? `Client removed. This slot stays occupied until ${deleteLockLabel} per platform policy.`
+          : "Client removed.",
+      );
+      setDeleteOpen(false);
+      onRefresh();
+      onBack();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Couldn't remove this client.");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   const navItems: { id: View; label: string; emoji: string }[] = [
@@ -150,11 +274,19 @@ export default function ClientWorkspace({ client, onBack, onRefresh, onCreateCon
           <h2 className="font-display font-bold text-xl leading-tight">{client.company_name}</h2>
           <p className="text-xs text-muted-foreground font-body">{client.industry}</p>
         </div>
-        {pendingPosts.length > 0 && (
-          <span className="ml-auto text-xs bg-yellow-500 text-black font-bold rounded-full px-2 py-0.5">
-            {pendingPosts.length} pending
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {pendingPosts.length > 0 && (
+            <span className="text-xs bg-yellow-500 text-black font-bold rounded-full px-2 py-0.5">
+              {pendingPosts.length} pending
+            </span>
+          )}
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditOpen(true)}>
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-red-400 border-red-500/30 hover:text-red-300" onClick={openDeleteFlow}>
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </Button>
+        </div>
       </div>
 
       {/* Sub-nav */}
@@ -167,114 +299,64 @@ export default function ClientWorkspace({ client, onBack, onRefresh, onCreateCon
             {n.emoji} {n.label}
           </button>
         ))}
-        {/* Create content button always visible */}
-        <Button size="sm" onClick={() => onCreateContent(client)}
-          className="ml-auto font-display gap-1.5 mb-1">
+        <Button size="sm" onClick={() => onCreateContent(client)} className="ml-auto font-display gap-1.5 mb-1">
           <PlusCircle className="w-4 h-4" /> Create Content
         </Button>
       </div>
 
       {/* Views */}
       {view === "overview" && (
-        <div className="space-y-6">
-          <BrandProfileCard client={client} />
-
-          {/* Credentials Manager */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <CredentialsManager clientId={client.id} onUpdate={onRefresh} />
-          </div>
-
-          {pendingPosts.length > 0 ? (
-            <div>
-              <p className="text-sm font-display font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Pending Approval
-              </p>
-              <ApprovalCard posts={pendingPosts} onAction={onRefresh} />
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-3">
-              <Sparkles className="w-8 h-8 text-muted-foreground/40 mx-auto" />
-              <p className="text-sm text-muted-foreground font-body">No posts waiting for approval.</p>
-              <Button variant="outline" size="sm" onClick={() => onCreateContent(client)} className="font-display gap-2">
-                <PlusCircle className="w-4 h-4" /> Create a Post
-              </Button>
-            </div>
-          )}
-        </div>
+        <ClientOverviewTab
+          client={client}
+          pendingPosts={pendingPosts}
+          onCreateContent={onCreateContent}
+          onEditClient={() => setEditOpen(true)}
+        />
       )}
 
-      {view === "calendar" && (
-        <ContentCalendar clientId={client.id} />
-      )}
+      {view === "calendar" && <ContentCalendar clientId={client.id} />}
 
       {view === "social" && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Connect social media accounts for <strong>{client.company_name}</strong>. Tokens are stored securely for future API integrations.</p>
-          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-            {PLATFORMS.map((p) => {
-              const acc = socialAccounts.find((a) => a.platform === p.id);
-              return (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-3 bg-card">
-                  <span className={`text-lg ${p.color}`}>{p.emoji}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{p.id}</p>
-                    {acc?.account_handle && <p className="text-xs text-muted-foreground">@{acc.account_handle}</p>}
-                  </div>
-                  {acc
-                    ? <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-xs text-green-400"><Wifi className="w-3 h-3" /> Connected</span>
-                        <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7 px-2"
-                          onClick={() => { setConnectModal(p.id); setHandle(acc.account_handle ?? ""); setToken(""); }}>Edit</Button>
-                        <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 px-2"
-                          onClick={() => disconnectAccount(p.id)}><X className="w-3 h-3" /></Button>
-                      </div>
-                    : <Button size="sm" variant="outline" className="text-xs gap-1.5 font-display"
-                        onClick={() => {
-                          if (p.id === "Instagram" || p.id === "LinkedIn") {
-                            initiateOAuth(p.id);
-                          } else {
-                            setConnectModal(p.id); setHandle(""); setToken("");
-                          }
-                        }}>
-                        {(p.id === "Instagram" || p.id === "LinkedIn")
-                          ? <><ExternalLink className="w-3 h-3" /> Connect via OAuth</>
-                          : <><WifiOff className="w-3 h-3" /> Connect</>
-                        }
-                      </Button>
-                  }
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <SocialAccountsView
+          clientName={client.company_name}
+          socialAccounts={socialAccounts}
+          onConnect={handleConnect}
+          onDisconnect={disconnectAccount}
+          onEditManual={handleEditManual}
+        />
       )}
 
-      {/* Connect modal */}
-      {connectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4 mx-4">
-            <h3 className="text-base font-semibold font-display">Connect {connectModal}</h3>
-            <p className="text-xs text-muted-foreground">Enter the account details. The access token will be stored for future API use.</p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-foreground block mb-1">Account Handle (username)</label>
-                <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="e.g. mybrand" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-foreground block mb-1">Access Token <span className="text-muted-foreground">(optional for now)</span></label>
-                <Input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste token when available" />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" size="sm" onClick={() => { setConnectModal(null); setHandle(""); setToken(""); }}>Cancel</Button>
-              <Button size="sm" disabled={!handle.trim() || saving} onClick={connectAccount} className="gap-1.5">
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modals */}
+      <SocialConnectModal
+        platform={connectModal}
+        isOpen={connectModal !== null}
+        onClose={() => { setConnectModal(null); setHandle(""); setToken(""); }}
+        handle={handle}
+        setHandle={setHandle}
+        token={token}
+        setToken={setToken}
+        onSave={connectAccount}
+        isSaving={saving}
+      />
+
+      <ClientDetailsEditor
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        onSave={saveClientDetails}
+        isSaving={isSavingClient}
+        canSave={canSaveClient}
+      />
+
+      <ClientDeleteAlert
+        isOpen={deleteOpen}
+        onClose={setDeleteOpen}
+        onConfirm={deleteClient}
+        clientName={client.company_name}
+        slotLockUntil={slotLockUntil}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

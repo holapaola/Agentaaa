@@ -47,16 +47,28 @@ const Auth = () => {
           description: "We sent you a verification link to confirm your account.",
         });
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Something went wrong.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const PLANS = {
-    personal: { name: "Personal", price: "$29", period: "/mo", features: ["1 Brand Profile", "50 Posts/month", "Basic Analytics", "Email Support"] },
-    agency: { name: "Agency", price: "$99", period: "/mo", features: ["Unlimited Clients", "Unlimited Posts", "Advanced Analytics", "Priority Support", "White-label Reports"] },
+    personal: {
+      name: "Personal",
+      description: "Best for testing the workspace yourself before managing clients.",
+      features: ["Single-user workspace", "Create and refine content", "Explore the workflow"],
+    },
+    agency: {
+      name: "Agency",
+      description: "Best for managing clients, content calendars, and social accounts.",
+      features: ["Client workspaces", "Content studio and calendar", "Social account management"],
+    },
   };
 
   return (
@@ -101,7 +113,7 @@ const Auth = () => {
                           }`}
                         >
                           <div className="font-display font-semibold text-sm capitalize">{type}</div>
-                          <div className="text-primary font-display font-bold text-lg mt-1">{PLANS[type].price}<span className="text-xs text-muted-foreground font-normal">{PLANS[type].period}</span></div>
+                          <div className="text-sm text-muted-foreground mt-1 font-body">{PLANS[type].description}</div>
                         </button>
                       ))}
                     </div>
@@ -144,16 +156,14 @@ const Auth = () => {
               {(["personal", "agency"] as const).map((type) => (
                 <div
                   key={type}
-                  className={`glass-card rounded-xl p-6 transition-all ${
-                    !isLogin && profileType === type ? "border-primary ring-1 ring-primary/30" : ""
-                  }`}
-                >
+                   className={`glass-card rounded-xl p-6 transition-all ${
+                     !isLogin && profileType === type ? "border-primary ring-1 ring-primary/30" : ""
+                   }`}
+                 >
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-display font-semibold text-lg capitalize">{PLANS[type].name}</h3>
-                    <div className="font-display font-bold text-2xl text-primary">
-                      {PLANS[type].price}<span className="text-sm text-muted-foreground font-normal">{PLANS[type].period}</span>
-                    </div>
                   </div>
+                  <p className="text-sm text-muted-foreground font-body mb-4">{PLANS[type].description}</p>
                   <ul className="space-y-2">
                     {PLANS[type].features.map((f) => (
                       <li key={f} className="text-sm text-muted-foreground font-body flex items-center gap-2">
